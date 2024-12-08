@@ -2,8 +2,9 @@ package pl.mojezapiski.ai.cook;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.parser.BeanOutputParser;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,17 +31,18 @@ public class CookRestController {
 
     @PostMapping("/recipeSuggestions")
     RecipeResponse suggestRecipe(@RequestBody RecipeRequest request) {
-        BeanOutputParser<RecipeResponse> parser = new BeanOutputParser<>(RecipeResponse.class);
+        BeanOutputConverter<RecipeResponse> outputConverter = new BeanOutputConverter<>(
+                new ParameterizedTypeReference<>() { });
         PromptTemplate template = getPromptTemplate();
         template.add("skladniki", request.ingredients());
         template.add("dieta", request.diet());
         template.add("posilek", request.mealType());
-        template.add("format", parser.getFormat());
+        template.add("format", outputConverter.getFormat());
 
         var prompt = template.create();
         var response = openAiChatClient.call(prompt);
 
         var content = response.getResult().getOutput().getContent();
-        return parser.parse(content);
+        return outputConverter.convert(content);
     }
 }
