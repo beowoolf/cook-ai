@@ -32,7 +32,8 @@ public class CookRestController {
     @PostMapping("/recipeSuggestions")
     RecipeResponse suggestRecipe(@RequestBody RecipeRequest request) {
         BeanOutputConverter<RecipeResponse> outputConverter = new BeanOutputConverter<>(
-                new ParameterizedTypeReference<>() { });
+                new ParameterizedTypeReference<>() {
+                });
         PromptTemplate template = getPromptTemplate();
         template.add("skladniki", request.ingredients());
         template.add("dieta", request.diet());
