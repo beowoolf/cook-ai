@@ -43,7 +43,7 @@ public class CookRestController {
         var prompt = template.create();
         var response = openAiChatClient.call(prompt);
 
-        var content = response.getResult().getOutput().getContent();
+        var content = response.getResult().getOutput().getText();
         return outputConverter.convert(content);
     }
 }
