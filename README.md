@@ -1,87 +1,181 @@
 # cook-ai
 
-[![Java](https://img.shields.io/badge/Java-25-orange)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-brightgreen)](https://spring.io/projects/spring-boot)
-[![Spring AI](https://img.shields.io/badge/Spring%20AI-1.1.8-blue)](https://spring.io/projects/spring-ai)
+[![Java](https://img.shields.io/badge/Java-25-orange.svg?logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-brightgreen.svg?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Spring AI](https://img.shields.io/badge/Spring%20AI-1.1.8-6DB33F.svg?logo=spring&logoColor=white)](https://spring.io/projects/spring-ai)
+[![Docker](https://img.shields.io/badge/Docker-Multi--stage-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-Unlicensed-lightgrey.svg)](#license)
 
-## Table of contents
+An AI-powered recipe generation REST service built with **Spring Boot 3.5.16**, **Java 25**, and **Spring AI 1.1.8**, integrating with the **OpenAI API** to generate structured culinary recipes tailored to available ingredients and dietary preferences.
+
+---
+
+## Table of Contents
 
 - [Project description](#project-description)
 - [Tech stack](#tech-stack)
 - [Getting started locally](#getting-started-locally)
+  - [Prerequisites](#prerequisites)
+  - [Configuration](#configuration)
+  - [Run with Maven Wrapper](#run-with-maven-wrapper)
+  - [Run with Docker Compose](#run-with-docker-compose)
+  - [Run with Docker standalone](#run-with-docker-standalone)
+  - [API Reference and Testing](#api-reference-and-testing)
 - [Available scripts](#available-scripts)
 - [Project scope](#project-scope)
 - [Project status](#project-status)
 - [License](#license)
 
+---
+
 ## Project description
 
-**cook-ai** is a small Spring Boot REST service that generates recipe suggestions using OpenAI through [Spring AI](https://docs.spring.io/spring-ai/reference/). You send available ingredients, a diet preference, and a meal type; the model returns a structured recipe (title, preparation time, and step-by-step instructions) in Polish.
+**cook-ai** is a backend service designed to eliminate food waste and culinary indecision. By taking an inventory of available ingredients, dietary constraints, and target meal types, the service communicates with OpenAI's language models via [Spring AI](https://docs.spring.io/spring-ai/reference/) to generate personalized, step-by-step recipes formatted in Polish.
 
-The project demonstrates how to:
+### Key Highlights
 
-- Prompt an LLM with a `PromptTemplate` and user-specific variables.
-- Parse model output into a typed Java object with `BeanOutputConverter`.
-- Expose the result as JSON from a single REST endpoint.
+- **Dynamic Prompt Engineering**: Employs `PromptTemplate` to construct contextual prompts parameterized with available ingredients, diet type, meal category, and explicit response format instructions.
+- **Strict Structured Outputs**: Leverages Spring AI's `BeanOutputConverter` with `ParameterizedTypeReference` to enforce strongly-typed JSON schema responses from the LLM, deserializing directly into modern Java records (`RecipeResponse`).
+- **Container-Ready Architecture**: Packaged as an executable WAR with multi-stage Alpine Docker containerization and Docker Compose orchestration.
+- **Stateless RESTful Design**: Exposes an intuitive `POST /recipeSuggestions` endpoint for easy integration into web, mobile, or smart kitchen clients.
 
-Maven coordinates: `pl.mojezapiski:ai:0.0.1-SNAPSHOT` (application name: `ai`).
+### Processing Workflow
+
+```text
+Client Request (JSON)
+       │
+       ▼
+CookRestController  ──►  PromptTemplate (Variables + JSON Format Spec)
+                                  │
+                                  ▼
+                          OpenAiChatModel  ──►  OpenAI API
+                                                     │
+Client Response (JSON) ◄── BeanOutputConverter ◄─────┘
+```
+
+---
 
 ## Tech stack
 
-| Layer | Technology |
-| --- | --- |
-| Language | Java 25 |
-| Framework | Spring Boot 3.5.16 |
-| AI integration | Spring AI 1.1.8 (`spring-ai-starter-model-openai`) |
-| Web | Spring Web (REST), Spring WebFlux (transitive stack) |
-| Packaging | WAR (runnable as embedded app or deployable to an external servlet container via `ServletInitializer`) |
-| Build | Maven (Maven Wrapper included) |
-| Utilities | Lombok |
-| Testing | Spring Boot Test, Reactor Test |
+| Category | Technology | Version / Details |
+| --- | --- | --- |
+| **Language** | Java | 25 (Java Records, Text Blocks) |
+| **Framework** | Spring Boot | 3.5.16 |
+| **AI Integration** | Spring AI | 1.1.8 (`spring-ai-starter-model-openai`) |
+| **Web Layer** | Spring Web | Spring MVC (RESTful endpoints), Spring WebFlux |
+| **Application Server** | Apache Tomcat | Embedded Tomcat (`spring-boot-starter-tomcat`, `provided` scope) |
+| **Containerization** | Docker & Docker Compose | Multi-stage build (`eclipse-temurin:25-jdk-alpine` -> `eclipse-temurin:25-jre-alpine`) |
+| **Build Tool** | Apache Maven | Maven Wrapper (`mvnw`, `mvnw.cmd`) |
+| **Boilerplate Reduction** | Project Lombok | Lombok annotation processor |
+| **Testing** | JUnit 5 & Spring Boot Test | `spring-boot-starter-test`, `reactor-test` |
+| **External AI Provider** | OpenAI API | Chat completion endpoint (requires API key) |
 
-External service: **OpenAI API** (API key required).
+---
 
 ## Getting started locally
 
 ### Prerequisites
 
-- JDK 25
-- An [OpenAI API key](https://platform.openai.com/api-keys)
+Ensure you have the following installed on your local machine:
+
+- **Java Development Kit (JDK)**: Version 25 or higher
+- **OpenAI API Key**: Active API key from the [OpenAI Platform](https://platform.openai.com/api-keys)
+- **Docker & Docker Compose** *(optional)*: For running in a containerized environment
 
 ### Configuration
 
-Set the OpenAI API key as an environment variable (recommended):
+The application requires an OpenAI API key. In `src/main/resources/application.properties`, the key is bound as:
 
-```bash
-# Linux / macOS
-export OPENAI_API_KEY=your-api-key-here
-
-# Windows (PowerShell)
-$env:OPENAI_API_KEY = "your-api-key-here"
+```properties
+spring.application.name=ai
+spring.ai.openai.api-key=${OPENAI_API_KEY:set_env_var}
 ```
 
-The application reads the key from `spring.ai.openai.api-key`, which defaults to the `OPENAI_API_KEY` environment variable (see `src/main/resources/application.properties`).
+Export the key in your terminal before running:
 
-### Run the application
-
-From the project root:
-
+**Linux / macOS:**
 ```bash
-# Linux / macOS
+export OPENAI_API_KEY="your-actual-openai-api-key"
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:OPENAI_API_KEY="your-actual-openai-api-key"
+```
+
+**Windows (Command Prompt):**
+```cmd
+set OPENAI_API_KEY=your-actual-openai-api-key
+```
+
+---
+
+### Run with Maven Wrapper
+
+Execute the application using the included Maven wrapper from the project root:
+
+**Linux / macOS:**
+```bash
 ./mvnw spring-boot:run
-
-# Windows
-mvnw.cmd spring-boot:run
 ```
 
-By default the server listens on **http://localhost:8080**.
+**Windows:**
+```powershell
+.\mvnw.cmd spring-boot:run
+```
 
-### Try the API
+Once started, the application will listen on **`http://localhost:8080`**.
 
-**Endpoint:** `POST /recipeSuggestions`  
-**Content-Type:** `application/json`
+---
 
-Example request:
+### Run with Docker Compose
+
+A pre-configured `docker-compose.yml` file is provided in the repository root.
+
+1. Ensure `OPENAI_API_KEY` is set in your environment (or create a `.env` file in the root containing `OPENAI_API_KEY=your_key_here`).
+2. Build and start the container:
+
+```bash
+docker compose up --build
+```
+
+To run in the background (detached mode):
+```bash
+docker compose up -d
+```
+
+To stop the service:
+```bash
+docker compose down
+```
+
+---
+
+### Run with Docker standalone
+
+You can build and run the multi-stage Docker container manually:
+
+```bash
+# Build the Docker image
+docker build -t cook-ai:latest .
+
+# Run the container exposing port 8080
+docker run -d --name cook-ai -p 8080:8080 -e OPENAI_API_KEY="your-api-key-here" cook-ai:latest
+```
+
+---
+
+### API Reference and Testing
+
+#### **Endpoint:** `POST /recipeSuggestions`
+
+Generates a structured recipe based on provided ingredients and preferences.
+
+- **URL:** `http://localhost:8080/recipeSuggestions`
+- **Method:** `POST`
+- **Headers:** `Content-Type: application/json`
+
+#### Example Request (`cURL`)
 
 ```bash
 curl -X POST http://localhost:8080/recipeSuggestions \
@@ -89,76 +183,116 @@ curl -X POST http://localhost:8080/recipeSuggestions \
   -d '{
     "ingredients": [
       { "name": "jajka", "weight": 3 },
-      { "name": "szpinak", "weight": 200 }
+      { "name": "szpinak", "weight": 150 },
+      { "name": "czosnek", "weight": 10 },
+      { "name": "oliwa z oliwek", "weight": 15 }
     ],
     "diet": "wegetariańska",
     "mealType": "śniadanie"
   }'
 ```
 
-Example response shape:
+#### Request Payload Structure
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `ingredients` | `Array<Ingredient>` | List of available ingredients. Each item contains `name` (`String`) and `weight` (`Double`). |
+| `diet` | `String` | Dietary requirement (e.g., `"wegetariańska"`, `"wegańska"`, `"bezglutenowa"`, `"keto"`). |
+| `mealType` | `String` | Target meal type (e.g., `"śniadanie"`, `"obiad"`, `"kolacja"`, `"deser"`). |
+
+#### Example Response Body
 
 ```json
 {
-  "title": "…",
+  "title": "Aromatyczna jajecznica ze świeżym szpinakiem i czosnkiem",
   "prepTimeMinutes": 15,
   "instructionSteps": [
-    "…",
-    "…"
+    "Umyj i osusz liście szpinaku, a ząbek czosnku drobno posiekaj.",
+    "Na patelni rozgrzej oliwę z oliwek i podsmaż posiekany czosnek przez około 30 sekund.",
+    "Dodaj świeży szpinak i duś na małym ogniu, aż zmniejszy swoją objętość (około 2 minuty).",
+    "W misce roztrzep jajka ze szczyptą soli i pieprzu, a następnie wlej na patelnię ze szpinakiem.",
+    "Smaż na małym ogniu delikatnie mieszając do uzyskania pożądanej konsystencji.",
+    "Podawaj natychmiast po przygotowaniu."
   ]
 }
 ```
 
-Field mapping:
+#### Response Payload Structure
 
-| JSON field | Type | Description |
+| Field | Type | Description |
 | --- | --- | --- |
-| `ingredients` | array of `{ "name", "weight" }` | Available ingredients (weight is a numeric amount in your chosen unit) |
-| `diet` | string | Diet constraint (free text, e.g. vegetarian, gluten-free) |
-| `mealType` | string | Preferred meal type (e.g. breakfast, lunch, dinner) |
+| `title` | `String` | The generated recipe title in Polish. |
+| `prepTimeMinutes` | `Integer` | Estimated total preparation and cooking time in minutes. |
+| `instructionSteps` | `List<String>` | Ordered step-by-step cooking instructions in Polish. |
 
-Recipe text and steps are generated **in Polish**, as defined in the controller prompt.
+---
 
 ## Available scripts
 
-This project uses the Maven Wrapper. Common commands:
+### Maven Commands
+
+| Command (Unix) | Command (Windows) | Description |
+| --- | --- | --- |
+| `./mvnw spring-boot:run` | `.\mvnw.cmd spring-boot:run` | Runs the application locally using the embedded Tomcat server |
+| `./mvnw test` | `.\mvnw.cmd test` | Executes unit and context load smoke tests |
+| `./mvnw clean package` | `.\mvnw.cmd clean package` | Compiles source code and packages a WAR archive in `target/` |
+| `./mvnw clean package -DskipTests` | `.\mvnw.cmd clean package -DskipTests` | Builds the WAR archive bypassing test execution (used in Dockerfile) |
+| `./mvnw clean verify` | `.\mvnw.cmd clean verify` | Runs tests, verifies packaging, and executes build verifications |
+
+### Docker Commands
 
 | Command | Description |
 | --- | --- |
-| `./mvnw spring-boot:run` / `mvnw.cmd spring-boot:run` | Start the application locally |
-| `./mvnw test` / `mvnw.cmd test` | Run tests (`AiApplicationTests` — context load smoke test) |
-| `./mvnw clean package` / `mvnw.cmd clean package` | Build the WAR artifact under `target/` |
-| `./mvnw clean verify` / `mvnw.cmd clean verify` | Run tests and package in one step |
+| `docker compose up --build` | Builds the image and starts the containerized service |
+| `docker compose up -d` | Starts the containerized service in background / detached mode |
+| `docker compose down` | Stops and removes containers and networks created by Docker Compose |
+| `docker compose logs -f` | Follows real-time logs from the running `cook-ai-backend` container |
+| `docker build -t cook-ai .` | Manually builds the multi-stage Docker image |
+| `docker run -p 8080:8080 -e OPENAI_API_KEY=... cook-ai` | Runs the Docker container locally |
 
-On Windows, use `mvnw.cmd` instead of `./mvnw`.
+---
 
 ## Project scope
 
-**In scope**
+### Currently Implemented (In Scope)
 
-- One REST controller (`CookRestController`) with `POST /recipeSuggestions`.
-- Structured request/response models: `RecipeRequest`, `RecipeResponse`, `Ingredient`.
-- OpenAI chat completion via `OpenAiChatModel` and prompt formatting for ingredients, diet, and meal type.
-- Spring Boot application entry point and WAR deployment support.
+- **AI-Powered Recipe Generation**: Integration with OpenAI chat models using Spring AI.
+- **Dynamic Variable Prompting**: Constructing tailored prompts from ingredient lists, dietary requirements, and meal categories.
+- **Type-Safe Structured Output**: Utilizing `BeanOutputConverter` to map AI text responses directly to Java records (`RecipeResponse`).
+- **REST API Endpoint**: Exposed `POST /recipeSuggestions` endpoint.
+- **Flexible Packaging & Deployment**:
+  - Standalone executable WAR with embedded Tomcat.
+  - Deployable to external servlet containers via `SpringBootServletInitializer`.
+  - Multi-stage Docker image packaging via Eclipse Temurin 25 Alpine.
+  - Docker Compose orchestration with environment variable delegation.
+- **Basic Context Testing**: Spring Boot smoke test (`AiApplicationTests`) verifying application context loading.
 
-**Out of scope (current codebase)**
+### Future Enhancements (Out of Scope for Current Release)
 
-- Authentication, rate limiting, or API keys for clients.
-- Persistence (database), user accounts, or recipe history.
-- Frontend UI, OpenAPI/Swagger documentation, or production deployment configs.
-- Automated integration tests against the live OpenAI API.
+- **User Authentication & Authorization**: API Key management, JWT, or OAuth2 access controls.
+- **Data Persistence**: Database storage (JPA / PostgreSQL) for saving user recipes, favorite dishes, or ingredient history.
+- **Frontend User Interface**: Web dashboard (React, Vue) or mobile client for visual ingredient selection.
+- **API Documentation**: OpenAPI 3 / Swagger UI (`springdoc-openapi`) integration.
+- **Rate Limiting & Caching**: Redis-backed caching for frequent ingredient combinations and IP/User rate limits.
+- **Multilingual Support**: Supporting recipe prompts and instructions in multiple languages (currently Polish only).
+- **Mock Testing for AI Client**: Comprehensive integration tests with mocked OpenAI responses.
+
+---
 
 ## Project status
 
-| Item | Value |
+| Metric | Status |
 | --- | --- |
-| Version | `0.0.1-SNAPSHOT` |
-| Maturity | Early-stage / example project |
-| CI | Not configured in this repository |
-| Tests | Minimal (`contextLoads` only) |
+| **Current Version** | `0.0.1-SNAPSHOT` |
+| **Development Phase** | Active Proof-of-Concept / Functional Prototype |
+| **Build Status** | Passing (`mvnw clean package`) |
+| **CI/CD Pipeline** | Not configured |
+| **OpenAI Integration** | Functional (requires valid API credentials) |
 
-The POM description matches the project goal: an example of formatting and consuming structured AI responses in a Spring application.
+---
 
 ## License
 
-No `LICENSE` file is present in this repository, and the Maven POM does not declare a specific license. If you plan to publish or reuse this code, add an appropriate license file and update `pom.xml` accordingly.
+This repository does not currently include a standalone `LICENSE` file, and no specific license is declared in `pom.xml`. All rights are reserved by the author.
+
+If you intend to use, modify, or distribute this codebase as an open-source project, please consider adding a standard open-source license such as the [MIT License](https://opensource.org/licenses/MIT) or the [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0).
